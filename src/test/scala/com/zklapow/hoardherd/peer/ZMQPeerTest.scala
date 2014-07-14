@@ -16,14 +16,14 @@ class ZMQPeerTest {
   def testPeering() {
     var servers: List[ZMQCacheServer[StringByteView]] = List()
     var addresses: List[String] = List()
-    for (i <- 0 to 1) {
+    for (i <- 0 to 5) {
       servers = servers :+ startServer(6500 + i)
-      addresses = addresses :+ s"tcp://localhost:${5000 + i}"
+      addresses = addresses :+ s"tcp://localhost:${6500 + i}"
     }
 
     val peerPicker = new PeerPicker[ZMQPeer](addresses.map((address: String) => ZMQPeer.create(address, 5)))
 
-    for (i <- 0 to 500) {
+    for (i <- 0 to 200) {
       val peer = peerPicker.pickPeer(i.toString)
       assertThat(peer.isDefined).isTrue()
 

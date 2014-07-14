@@ -1,7 +1,8 @@
 package com.zklapow.hoardherd.peer.zmq
 
 import java.util.UUID
-import java.util.concurrent.Executors
+import java.util.concurrent.{ExecutorService, Executors}
+import java.util.concurrent.atomic.AtomicBoolean
 
 import com.google.common.cache.LoadingCache
 import com.google.common.util.concurrent.ThreadFactoryBuilder
@@ -23,6 +24,12 @@ class ZMQCacheServer[T <: ByteView](cache: LoadingCache[String, T], port: Option
 
   val frontendPort = port.getOrElse(5555)
   var thread: Option[Thread] = None
+  var isRunning: AtomicBoolean = new AtomicBoolean(true)
+
+  var socketContext: Option[ZMQ.Context] = None
+  var frontendSocket: Option[ZMQ.Socket] = None
+  var backendSocket: Option[ZMQ.Socket] = None
+  var workerService: Option[ExecutorService] = None
 
   def start() = {
     if (thread.isEmpty) {
@@ -32,20 +39,32 @@ class ZMQCacheServer[T <: ByteView](cache: LoadingCache[String, T], port: Option
   }
 
   def stop() = {
+    isRunning.getAndSet(false)
+
+    frontendSocket.foreach((socket: ZMQ.Socket) => socket.close())
+    backendSocket.foreach((socket: ZMQ.Socket) => socket.close())
+    socketContext.foreach((context: ZMQ.Context) => context.close())
+    workerService.foreach((service: ExecutorService) => service.shutdown())
+
     thread.foreach((thread: Thread) => {
-      thread.interrupt()
-      thread.join()
+      thread.join(5000)
+
+      println(s"$id: shutdown")
     })
   }
 
   override def run(): Unit = {
     val context = ZMQ.context(1)
+    socketContext = Some(context)
 
     val backend = context.socket(ZMQ.ROUTER)
     val frontend = context.socket(ZMQ.ROUTER)
 
     backend.bind(workerSocketAddr)
     frontend.bind(s"tcp://*:$frontendPort")
+
+    backendSocket = Some(backend)
+    frontendSocket = Some(frontend)
 
     println(s"ZMQ Server started on port $frontendPort")
 
@@ -58,13 +77,15 @@ class ZMQCacheServer[T <: ByteView](cache: LoadingCache[String, T], port: Option
         .build()
     )
 
+    workerService = Some(executor)
+
     for (i <- 0 to numWorkers) {
       executor.submit(new CacheWorker(cache))
     }
 
     val workers = new mutable.Queue[String]()
 
-    while (!Thread.currentThread().isInterrupted) {
+    while (isRunning.get()) {
       val items: Poller = new Poller(2)
 
       items.register(backend, Poller.POLLIN)
@@ -74,7 +95,7 @@ class ZMQCacheServer[T <: ByteView](cache: LoadingCache[String, T], port: Option
       }
 
       if (items.poll() < 0) {
-        throw new InterruptedException
+        return
       }
 
       // We got a result from a worker thread

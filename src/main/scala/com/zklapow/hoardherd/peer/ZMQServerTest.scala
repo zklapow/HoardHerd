@@ -18,6 +18,9 @@ object ZMQServerTest {
 
     val cacheServer = new ZMQCacheServer[StringByteView](cache, Some(5556), Some(5))
     cacheServer.start()
+
+    Thread.sleep(10)
+    cacheServer.stop()
   }
 
   class StringByteView(string: String) extends ByteView {
