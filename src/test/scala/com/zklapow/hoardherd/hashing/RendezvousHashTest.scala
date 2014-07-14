@@ -26,6 +26,13 @@ class RendezvousHashTest {
     assertThat(rhash.get("key").isEmpty).isTrue()
   }
 
+  @Test def testInitialNodes(): Unit = {
+    val rhash = new RendezvousHash[String, OrderedString](stringFunnel, orderedStringFunnel, List("node1", "node2"))
+
+    val node: String = rhash.get("key").get
+    assertThat(node).isNotEmpty
+  }
+
   @Test def testConsistentAfterRemove(): Unit = {
     val rhash = create()
     for (i <- new Range(0, 1000, 1)) {

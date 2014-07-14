@@ -4,7 +4,6 @@ import com.google.common.hash.{Hashing, Funnel}
 
 import scala.collection.immutable.HashSet
 import scala.reflect.ClassTag
-import scala.util.Sorting
 
 class RendezvousHash[K, V <: Ordered[V]](keyFunnel: Funnel[K], valueFunnel: Funnel[V], initial: Iterable[V]) (implicit vtag: ClassTag[V]) {
   private val hashFunction = Hashing.murmur3_128()

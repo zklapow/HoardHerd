@@ -1,5 +1,15 @@
 package com.zklapow.hoardherd.peer
 
-class NoPeers extends PeerPicker {
-  def pickPeer(key: String): Option[Peer] = None
+import com.zklapow.hoardherd.proto.{GetResponse, GetRequest}
+
+class NoPeers extends PeerPicker[NoPeer](List()) {
+  override def pickPeer(key: String): Option[NoPeer] = None
+}
+
+class NoPeer extends Peer[NoPeer] {
+  override def get(request: GetRequest, context: Option[Any]): GetResponse = new GetResponse()
+
+  override def getId: String = ""
+
+  override def close(): Unit = {}
 }
