@@ -21,10 +21,11 @@ object ZMQPeer {
   }
 }
 
-class ZMQPeer(peerAddress: String, queueSize: Int) extends Peer[ZMQPeer] {
+class ZMQPeer(peerAddress: String, queueSize: Int, local: Boolean = false) extends Peer[ZMQPeer] {
 
   def getAddress = peerAddress
   def getId = getAddress
+  def isLocal = local
 
   val clients: List[ZMQClient] = List()
   val clientQueue = new ArrayBlockingQueue[ZMQClient](queueSize)

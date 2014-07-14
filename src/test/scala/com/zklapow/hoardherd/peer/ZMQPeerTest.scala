@@ -14,7 +14,7 @@ class ZMQPeerTest {
 
   @Test
   def testPeering() {
-    var servers: List[ZMQCacheServer[StringByteView]] = List()
+    var servers: List[ZMQCacheServer] = List()
     var addresses: List[String] = List()
     for (i <- 0 to 5) {
       servers = servers :+ startServer(6500 + i)
@@ -39,16 +39,8 @@ class ZMQPeerTest {
     }
   }
 
-  def startServer(port: Int): ZMQCacheServer[StringByteView] = {
-    val cache: LoadingCache[String, StringByteView] = CacheBuilder.newBuilder()
-      .recordStats()
-      .maximumSize(10485760L).build(new CacheLoader[String, StringByteView] {
-        override def load(key: String): StringByteView = {
-          new StringByteView(UUID.randomUUID().toString)
-        }
-      })
-
-    val cacheServer = new ZMQCacheServer[StringByteView](cache, Some(port), Some(5))
+  def startServer(port: Int): ZMQCacheServer = {
+    val cacheServer = new ZMQCacheServer(Some(port), Some(5))
     cacheServer.start()
 
     cacheServer

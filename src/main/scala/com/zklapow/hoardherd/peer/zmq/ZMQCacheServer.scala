@@ -4,11 +4,10 @@ import java.util.UUID
 import java.util.concurrent.{ExecutorService, Executors}
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.google.common.cache.LoadingCache
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.google.protobuf.ByteString
-import com.zklapow.hoardherd.ByteView
-import com.zklapow.hoardherd.proto.GetResponse
+import com.zklapow.hoardherd.HoardHerd
+import com.zklapow.hoardherd.proto.{GetRequest, GetResponse}
 import org.zeromq.ZMQ
 import org.zeromq.ZMQ.Poller
 
@@ -18,7 +17,7 @@ object ZMQCacheServer {
   val READY = "READY"
 }
 
-class ZMQCacheServer[T <: ByteView](cache: LoadingCache[String, T], port: Option[Int], numWorkers: Option[Int]) extends Runnable {
+class ZMQCacheServer(port: Option[Int], numWorkers: Option[Int]) extends Runnable {
   val id = UUID.randomUUID().toString
   val workerSocketAddr = s"ipc://hoardherd-server-$id.ipc"
 
@@ -80,7 +79,7 @@ class ZMQCacheServer[T <: ByteView](cache: LoadingCache[String, T], port: Option
     workerService = Some(executor)
 
     for (i <- 0 to numWorkers) {
-      executor.submit(new CacheWorker(cache))
+      executor.submit(new CacheWorker())
     }
 
     val workers = new mutable.Queue[String]()
@@ -135,7 +134,7 @@ class ZMQCacheServer[T <: ByteView](cache: LoadingCache[String, T], port: Option
     }
   }
 
-  class CacheWorker(cache: LoadingCache[String, T]) extends Runnable {
+  class CacheWorker() extends Runnable {
     val id = UUID.randomUUID().toString
 
     override def run(): Unit = {
@@ -155,14 +154,20 @@ class ZMQCacheServer[T <: ByteView](cache: LoadingCache[String, T], port: Option
         val empty = socket.recvStr()
         assert(empty.length == 0)
 
-        val request = socket.recvStr()
+        val request = GetRequest.parseFrom(socket.recvStr().getBytes)
         println(s"[worker-$id] Serving request for: $request")
 
-        val result = cache.get(request)
+        // Get the main cache for this group
+        val cacheAndLoader = HoardHerd.hoards(request.`group`)
+        var result = cacheAndLoader.cache.getIfPresent(request.`key`)
+        if (result == null) {
+          result = cacheAndLoader.getLoader(request.`key`)
+        }
+
         println(s"[worker-$id] Sending: $result")
 
         val response = GetResponse.newBuilder
-          .setValue(ByteString.copyFrom(result.toBytes))
+          .setValue(ByteString.copyFrom(result))
           .build
 
         socket.sendMore(address)
