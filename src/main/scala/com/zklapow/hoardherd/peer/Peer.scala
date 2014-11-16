@@ -1,5 +1,7 @@
 package com.zklapow.hoardherd.peer
 
+import com.google.common.cache.Cache
+import com.google.protobuf.ByteString
 import com.zklapow.hoardherd.proto.{GetResponse, GetRequest}
 
 trait Peer[T <: Peer[T]] extends Ordered[T] with AutoCloseable {

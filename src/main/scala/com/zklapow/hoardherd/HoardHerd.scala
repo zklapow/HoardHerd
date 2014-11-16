@@ -10,24 +10,24 @@ object HoardHerd {
   var numWorkers = 5
   var serverStarted = false
 
-  val hoards = new mutable.HashMap[String, CacheAndLoader]()
+  val servers = new mutable.HashMap[String, ZMQCacheServer]
 
-  def newHoard[T <: ByteView](name: String, localAddress: String, peerAddresses: List[String],
-                              loader: (String) => Array[Byte], parser: (Array[Byte]) => T, maxSize: Long = 1000) {
-    if (!serverStarted) {
+  def newHoard(name: String, localAddress: String, peerAddresses: List[String], maxSize: Long = 1000, loader: (String) => Option[Array[Byte]]): Hoard = {
+    val hoard = new Hoard(name, localAddress, peerAddresses, maxSize, loader)
+
+    if (!servers.contains(name)) {
       this.synchronized {
-        if (!serverStarted) {
-          startServer
+        if (!servers.contains(name)) {
+          startServer(hoard.localCache, loader)
         }
       }
     }
-    val cacheAndLoader = new CacheAndLoader(loader, maxSize.toInt)
-    val hoard = new Hoard[T](name, localAddress, peerAddresses, cacheAndLoader, parser, maxSize)
-    hoards(name) = hoard.getCacheAndLoader
+
+    return hoard
   }
 
-  def startServer() {
-    new ZMQCacheServer(Some(port), Some(numWorkers))
+  def startServer(cache: Cache[String, Array[Byte]], loader: (String) => Option[Array[Byte]]) {
+    new ZMQCacheServer(Some(port), Some(numWorkers), cache, loader)
 
     serverStarted = true
   }

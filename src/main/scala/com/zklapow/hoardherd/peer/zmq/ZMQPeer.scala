@@ -3,6 +3,8 @@ package com.zklapow.hoardherd.peer.zmq
 import java.util.UUID
 import java.util.concurrent.ArrayBlockingQueue
 
+import com.google.common.cache.Cache
+import com.google.protobuf.ByteString
 import com.zklapow.hoardherd.peer.Peer
 import com.zklapow.hoardherd.proto.{GetResponse, GetRequest}
 import org.zeromq.ZMQ
@@ -21,11 +23,10 @@ object ZMQPeer {
   }
 }
 
-class ZMQPeer(peerAddress: String, queueSize: Int, local: Boolean = false) extends Peer[ZMQPeer] {
+class ZMQPeer(peerAddress: String, queueSize: Int) extends Peer[ZMQPeer] {
 
   def getAddress = peerAddress
   def getId = getAddress
-  def isLocal = local
 
   val clients: List[ZMQClient] = List()
   val clientQueue = new ArrayBlockingQueue[ZMQClient](queueSize)

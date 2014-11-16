@@ -18,3 +18,4 @@ libraryDependencies ++= Seq(
 testOptions += Tests.Argument(TestFrameworks.JUnit, "-q", "-v")
 
 addSbtPlugin("com.github.sbt" %% "sbt-scalabuff" % "1.3.7")
+

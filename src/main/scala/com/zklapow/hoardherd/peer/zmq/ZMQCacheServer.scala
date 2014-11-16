@@ -4,6 +4,7 @@ import java.util.UUID
 import java.util.concurrent.{ExecutorService, Executors}
 import java.util.concurrent.atomic.AtomicBoolean
 
+import com.google.common.cache.Cache
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.google.protobuf.ByteString
 import com.zklapow.hoardherd.HoardHerd
@@ -17,7 +18,7 @@ object ZMQCacheServer {
   val READY = "READY"
 }
 
-class ZMQCacheServer(port: Option[Int], numWorkers: Option[Int]) extends Runnable {
+class ZMQCacheServer(port: Option[Int], numWorkers: Option[Int], cache: Cache[String, Array[Byte]], loader: (String) => Option[Array[Byte]]) extends Runnable {
   val id = UUID.randomUUID().toString
   val workerSocketAddr = s"ipc://hoardherd-server-$id.ipc"
 
@@ -79,7 +80,7 @@ class ZMQCacheServer(port: Option[Int], numWorkers: Option[Int]) extends Runnabl
     workerService = Some(executor)
 
     for (i <- 0 to numWorkers) {
-      executor.submit(new CacheWorker())
+      executor.submit(new CacheWorker(cache, loader))
     }
 
     val workers = new mutable.Queue[String]()
@@ -134,7 +135,7 @@ class ZMQCacheServer(port: Option[Int], numWorkers: Option[Int]) extends Runnabl
     }
   }
 
-  class CacheWorker() extends Runnable {
+  class CacheWorker(cache: Cache[String, Array[Byte]], loader: (String) => Option[Array[Byte]]) extends Runnable {
     val id = UUID.randomUUID().toString
 
     override def run(): Unit = {
@@ -157,22 +158,24 @@ class ZMQCacheServer(port: Option[Int], numWorkers: Option[Int]) extends Runnabl
         val request = GetRequest.parseFrom(socket.recvStr().getBytes)
         println(s"[worker-$id] Serving request for: $request")
 
-        // Get the main cache for this group
-        val cacheAndLoader = HoardHerd.hoards(request.`group`)
-        var result = cacheAndLoader.cache.getIfPresent(request.`key`)
-        if (result == null) {
-          result = cacheAndLoader.getLoader(request.`key`)
+        val result = Option.apply(cache.getIfPresent(request.`key`))
+
+        var response: GetResponse = GetResponse.defaultInstance
+        if (result.isDefined) {
+          response = GetResponse.newBuilder.setValue(ByteString.copyFrom(result.get)).build
+        } else {
+          val value = loader(request.`key`)
+          if (value.isDefined) {
+            cache.put(request.`key`, value.get)
+            response = GetResponse.newBuilder.setValue(ByteString.copyFrom(value.get)).build
+          }
         }
 
-        println(s"[worker-$id] Sending: $result")
-
-        val response = GetResponse.newBuilder
-          .setValue(ByteString.copyFrom(result))
-          .build
+        println(s"[worker-$id] Sending: $response")
 
         socket.sendMore(address)
         socket.sendMore("")
-        socket.send(response.toByteString.toByteArray)
+        socket.send(response.toByteArray)
       }
 
       socket.close()

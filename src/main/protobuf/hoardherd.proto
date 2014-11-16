@@ -4,7 +4,6 @@ option java_outer_classname = "HoardHerdProtos";
 option java_package = "com.zklapow.hoardherd.proto";
 
 message GetRequest {
-  required string group = 1;
   required string key = 2; // not actually required/guaranteed to be UTF-8
 }
 
