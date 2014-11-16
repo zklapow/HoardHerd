@@ -3,7 +3,7 @@ package com.zklapow.hoardherd
 import org.junit.Test
 import org.fest.assertions.Assertions._
 
-class HoardHerdCacheTest {
+class ZMQHoardHerdCacheTest {
 
   @Test def testLoad(): Unit = {
     val cache = new HoardHerdCache

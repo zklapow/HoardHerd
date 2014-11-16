@@ -2,16 +2,16 @@ package com.zklapow.hoardherd.peer
 
 import com.google.common.cache.{CacheBuilder, Cache}
 import com.google.protobuf.ByteString
-import com.zklapow.hoardherd.ByteView
-import com.zklapow.hoardherd.peer.zmq.{ZMQPeer, ZMQCacheServer}
+import com.zklapow.hoardherd.peer.zmq.ZMQPeer
 import com.zklapow.hoardherd.proto.{GetRequest}
+import com.zklapow.hoardherd.server.ZMQCacheServer
 import org.junit.Test
 
 import org.fest.assertions.Assertions._
 
 class ZMQPeerTest {
 
-  val simpleLoader = (key: String) => Some(key.toBytes)
+  val simpleLoader = (key: String) => Some(ByteString.copyFromUtf8(key).toByteArray)
 
   @Test
   def testPeering() {
@@ -51,10 +51,4 @@ class ZMQPeerTest {
 
     cacheServer
   }
-
-  class StringByteView(string: String) extends ByteView {
-    override def toBytes: Array[Byte] = string.getBytes
-  }
-
-  implicit def stringByteViewWrapper(string: String): StringByteView = new StringByteView(string)
 }

@@ -1,15 +1,14 @@
-package com.zklapow.hoardherd.peer.zmq
+package com.zklapow.hoardherd.server
 
 import java.util.UUID
-import java.util.concurrent.{ExecutorService, Executors}
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.{ExecutorService, Executors}
 
 import com.google.common.cache.Cache
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.google.protobuf.ByteString
-import com.zklapow.hoardherd.HoardHerd
 import com.zklapow.hoardherd.proto.{GetRequest, GetResponse}
-import org.zeromq.ZMQ
+import org.zeromq.{ZMQException, ZMQ}
 import org.zeromq.ZMQ.Poller
 
 import scala.collection.mutable
@@ -61,7 +60,15 @@ class ZMQCacheServer(port: Option[Int], numWorkers: Option[Int], cache: Cache[St
     val frontend = context.socket(ZMQ.ROUTER)
 
     backend.bind(workerSocketAddr)
-    frontend.bind(s"tcp://*:$frontendPort")
+
+    try {
+      frontend.bind(s"tcp://*:$frontendPort")
+    } catch {
+      case zmqe: ZMQException => {
+        println(s"Could not bind to port $frontendPort: $zmqe")
+        throw zmqe
+      }
+    }
 
     backendSocket = Some(backend)
     frontendSocket = Some(frontend)
@@ -135,7 +142,7 @@ class ZMQCacheServer(port: Option[Int], numWorkers: Option[Int], cache: Cache[St
     }
   }
 
-  class CacheWorker(cache: Cache[String, Array[Byte]], loader: (String) => Option[Array[Byte]]) extends Runnable {
+  class CacheWorker(cache: Cache[String, Array[Byte]], loader: (String) => Option[Array[Byte]]) extends HoardServer(cache, loader) {
     val id = UUID.randomUUID().toString
 
     override def run(): Unit = {
@@ -156,7 +163,7 @@ class ZMQCacheServer(port: Option[Int], numWorkers: Option[Int], cache: Cache[St
         assert(empty.length == 0)
 
         val request = GetRequest.parseFrom(socket.recvStr().getBytes)
-        println(s"[worker-$id] Serving request for: $request")
+        println(s"$logPrefix Serving request for: $request")
 
         val result = Option.apply(cache.getIfPresent(request.`key`))
 
@@ -182,6 +189,6 @@ class ZMQCacheServer(port: Option[Int], numWorkers: Option[Int], cache: Cache[St
       context.term()
     }
 
-    def logPrefix = s"[worker-$id]"
+    def logPrefix = s"[worker-$id]:"
   }
 }

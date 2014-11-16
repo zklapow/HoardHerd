@@ -5,7 +5,7 @@ import com.zklapow.hoardherd.hashing.RendezvousHash
 
 import scala.reflect.ClassTag
 
-class PeerPicker[T <: Peer[T]](initialPeers: List[T]) (implicit c: ClassTag[T])  {
+class PeerPicker[T <: Peer[T]](initialPeers: List[T]) (implicit c: ClassTag[T]) {
   private val PEER_FUNNEL = new Funnel[T] {
     override def funnel(from: T, into: PrimitiveSink): Unit = {
       into.putBytes(from.getId.getBytes)

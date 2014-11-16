@@ -71,6 +71,7 @@ class ZMQPeer(peerAddress: String, queueSize: Int) extends Peer[ZMQPeer] {
     def close() = {
       socket.close()
       context.term()
+      context.close()
     }
   }
 
